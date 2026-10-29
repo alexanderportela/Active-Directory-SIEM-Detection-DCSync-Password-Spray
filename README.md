@@ -1,34 +1,51 @@
-Project Overview
+📖 Overview
 
-This project demonstrates the configuration of a Splunk Enterprise SIEM to ingest, parse, and visualize Active Directory attack telemetry from a Windows Server Domain Controller. The objective was to create a Real-Time SOC Dashboard capable of detecting brute-force attempts (Password Spraying) and replication abuse (DCSync) while overcoming common telemetry pipeline failures.
+This project demonstrates the deployment of a centralized Active Directory Security Operations Center (SOC) dashboard using Splunk Enterprise. The objective was to engineer an end-to-end telemetry pipeline capable of detecting two critical attack vectors: Password Spraying (stealthy brute-force) and DCSync (domain replication abuse). By enforcing Advanced Audit Policies and tuning custom Search Processing Language (SPL) queries, the SIEM now successfully ingests, parses, and visualizes localized attack telemetry, providing real-time visibility into identity compromises and privileged credential dumping.
 
-Architecture & Tools
+🏗️ Lab Architecture
 
-    Hyper-V Infrastructure: Windows Server Domain Controller (lab.local), Windows 11 Endpoint.
+    Domain Controller: Windows Server (WIN-CC7CVJNT055 on lab.local)
 
-    SIEM: Splunk Enterprise (Search Head & Indexer), Splunk Universal Forwarder.
+    Endpoint/Jump Box: Windows 11 Virtual Machine
 
-    Offensive Tooling: PowerShell (custom spray scripts), Mimikatz (DCSync).
+    SIEM Engine: Splunk Enterprise (Indexer & Search Head)
 
-Key Challenges & Detection Engineering
+    Telemetry Agent: Splunk Universal Forwarder
 
-    SPL Query Optimization: Initial Password Spray alerts failed because local attacks against 127.0.0.1 do not reliably populate the Source_Network_Address field in Event 4625. Rewrote the alert logic to rely strictly on stats dc(Account_Name) to trigger the > 3 threshold regardless of network source.
+    Offensive Tooling: Mimikatz (DCSync) and Custom PowerShell (Password Spraying)
 
-    Advanced Audit Policy Enforcement: DCSync attacks initially failed to generate Event 4662 logs. Diagnosed that default GPOs do not audit Directory Service Access. Engineered a fix by modifying the Default Domain Controllers Policy to force Advanced Audit Policy Configuration and updated the domain root SACL to audit "Replicating Directory Changes."
+⚙️ Deployment Lifecycle
 
-    Cron Job Contention: Simultaneous real-time alerts caused Splunk to hit maximum concurrent search limits, silently dropping alerts. Mitigated by staggering cron schedules (*/2 and */3) to optimize VM resource utilization.
+    Advanced Audit Policy Enforcement
+    To capture the telemetry required for detecting replication abuse, Active Directory's default legacy auditing had to be explicitly overridden.
 
-    Privilege Execution: Diagnosed UAC interference preventing auditpol from verifying policy enforcement and Mimikatz from interacting with LSASS.
+    Modified the Default Domain Controllers Policy to enforce "Advanced Audit Policy Configurations," specifically enabling Success auditing for "Directory Service Access" to generate Event ID 4662.
 
-Outcomes
-Successfully deployed a centralized Active Directory SOC dashboard that visualizes Event 4625 (Failed Logon) and Event 4662 (Directory Service Access) telemetry with automated alert triggers.
+    Configured the domain root System Access Control List (SACL) to audit "Replicating Directory Changes" for the Everyone principal, allowing Windows to monitor DCSync requests.
 
-Consolidated Reading Resources
+    Diagnosed and bypassed local User Account Control (UAC) suppression by strictly enforcing elevated Administrator contexts for all auditpol verifications and Mimikatz executions.
 
-    Event 4625 (Failed Logon): Search the Microsoft Learn documentation for "Event ID 4625." Pay special attention to the "Failure Reason" codes (like 0xC000006A for bad passwords) and how Windows logs local vs. network logons.
+    Telemetry Ingestion & Resource Management
+    The telemetry pipeline required performance tuning to ensure the Splunk alert engine could process the logs without dropping events due to lab hardware constraints.
 
-    Event 4662 & DCSync Mechanics: Read the Microsoft documentation on "Audit Directory Service Access" and "Event 4662." For the offensive side, search for "Harmj0y DCSync" to read the original breakdown of how Mimikatz abuses the Directory Replication Service (DRS) Remote Protocol.
+    Diagnosed skipped searches caused by multiple real-time alerts hitting Splunk's maximum concurrent search limits simultaneously.
 
-    Advanced Audit Policies vs. Legacy Auditing: Search for "Microsoft Advanced Audit Policy Configuration." This will explain why your lab reverted and why modern SOCs force advanced policies to override the legacy category settings.
+    Mitigated the contention by staggering the underlying alert cron schedules to */2 (DCSync) and */3 (Password Spray) minute intervals, optimizing CPU utilization.
 
-    Splunk SPL stats Command: Review the Splunk documentation for the stats command, specifically the dc() (distinct count) function you used today. Understanding how by clauses group data—and why they fail when a field is missing—is critical for SIEM engineering.
+    SPL Query Optimization
+    Detection logic was re-engineered to account for variables in how the Windows Local Security Authority (LSA) records network information during local vs. remote attacks.
+
+    Discovered that localized password sprays against 127.0.0.1 fail to reliably populate the Source_Network_Address field in Windows Event 4625.
+
+    Engineered a robust Splunk SPL query bypassing the missing IP dependency by utilizing stats dc(Account_Name). This allowed the alert to trigger purely on a mathematical threshold (> 3) of unique targeted accounts.
+
+    Stripped rigid hostname constraints from the DCSync alert logic, ensuring Event 4662 triggers independently of the executing Domain Controller's naming convention.
+
+    SOC Dashboard Visualization
+
+    Pushed the validated, scheduled alert metrics to a centralized Active Directory SOC dashboard.
+
+    Visualized the live telemetry via a Real-Time Alert Queue and prioritized Pie Charts to facilitate immediate analyst triage.
+
+🛡️ Strategic Impact (Blue Team Perspective)
+DCSync is notoriously difficult to detect because it abuses legitimate Active Directory replication protocols (MS-DRSR) rather than exploiting a software vulnerability. Similarly, "low and slow" password sprays are specifically designed to evade traditional account lockout thresholds. By forcing granular SACL auditing at the domain root and engineering SIEM alerts to mathematically correlate anomalous event groupings, defenders gain the critical visibility required to identify and intercept these stealthy attacks before threat actors can achieve total domain dominance.
