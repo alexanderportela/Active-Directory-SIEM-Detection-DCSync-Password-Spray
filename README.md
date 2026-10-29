@@ -1,0 +1,2 @@
+# Active-Directory-SIEM-Detection-DCSync-Password-Spray
+Engineered a Splunk SOC dashboard to detect Active Directory Password Sprays and DCSync attacks. Built in a Hyper-V lab, this project demonstrates end-to-end detection engineering: tuning SPL queries, troubleshooting telemetry pipelines, enforcing Advanced Audit Policies via GPO, and configuring domain SACLs for real-time threat visualization.
