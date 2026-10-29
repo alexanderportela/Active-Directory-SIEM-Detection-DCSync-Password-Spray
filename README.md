@@ -1,4 +1,5 @@
 Project Overview
+
 This project demonstrates the configuration of a Splunk Enterprise SIEM to ingest, parse, and visualize Active Directory attack telemetry from a Windows Server Domain Controller. The objective was to create a Real-Time SOC Dashboard capable of detecting brute-force attempts (Password Spraying) and replication abuse (DCSync) while overcoming common telemetry pipeline failures.
 
 Architecture & Tools
